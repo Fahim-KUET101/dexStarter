@@ -11,6 +11,7 @@ import { useSendTransaction, useWaitForTransaction } from "wagmi";
 
 function Swap(props) {
   const { address, isConnected } = props;
+  const [messageApi, contextHolder] = message.useMessage();
   const [slippage, setSlippage] = useState(2.5);
   const [tokenOneAmount, setTokenOneAmount] = useState(null);
   const [tokenTwoAmount, setTokenTwoAmount] = useState(null);
@@ -32,6 +33,10 @@ function Swap(props) {
       data: String(txDetails.data),
       value: String(txDetails.value),
     }
+  })
+
+  const { isLoading, isSuccess } = useWaitForTransaction({
+    hash: data?.hash,
   })
   function handleSlippageChange(e) {
     setSlippage(e.target.value);
@@ -94,7 +99,10 @@ function Swap(props) {
 
     const tx = await axios.get(
       `https://api.1inch.io/v5.2/1/swap?src=${tokenOne.address}&dst=${tokenTwo.address}&amount=${tokenOneAmount.padEnd(tokenOne.decimals+tokenOneAmount.length, '0')}&from=${address}&slippage=${slippage}`
-      )
+    )
+    let decimals = Number('1E${tokenTwo.decimals}')
+    setTokenTwoAmount((Number(tx.data.toTokenAmount)/decimals).toFixed(2));
+    setTxDetails(tx.data.tx);
   }
  
   useEffect(()=>{
@@ -108,6 +116,34 @@ function Swap(props) {
       sendTransaction();
     }
   }, [txDetails])
+
+  useEffect(()=>{
+    messageApi.destroy();
+    if(isLoading){
+      messageApi.open({
+        type: 'loading',
+        content: 'Transaction is Pending...',
+        duration: 0,
+      })
+    }    
+  },[isLoading])
+
+  useEffect(()=>{
+    messageApi.destroy();
+    if(isSuccess){
+      messageApi.open({
+        type: 'success',
+        content: 'Transaction Successful',
+        duration: 1.5,
+      })
+    }else if(txDetails.to){
+      messageApi.open({
+        type: 'error',
+        content: 'Transaction Failed',
+        duration: 1.50,
+      })
+    }
+  },[isSuccess])
 
 
   const settings = (
@@ -124,7 +160,8 @@ function Swap(props) {
   );
 
   return (
-      <>
+    <>
+      {contextHolder}
       <Modal
        open={isOpen}
        footer={null}
